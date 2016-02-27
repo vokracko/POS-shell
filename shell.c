@@ -71,6 +71,28 @@ char * set_null(char * str)
 	return str;
 }
 
+/**
+ * \brief Find redirect symbol and return file name 
+ * \param str
+ * \param c symbol
+ * \param[out] start - first symbol
+ * \return Start position of filename
+*/
+char * parse_redirect(char * str, char c, char ** start)
+{
+	char * symbol = *start = strchrnul(str, c);
+
+	if(*symbol == '\0')
+		 return symbol;
+
+	symbol++;
+
+	while(*symbol != '\0' && isspace(*symbol))
+		symbol++;
+	
+	return symbol;
+}
+
 void * thread_read(void * thread_data)
 {
 	printf("$");
@@ -126,6 +148,7 @@ void * thread_run(void * thread_data)
 	thread_data_t * data = (thread_data_t *) thread_data;
 	int argv_size = 10;
 	int i_file, o_file;
+	char * input_start, * output_start;
 
 	p.argv = malloc(sizeof(char*) * argv_size); // +1 NULL delimiter
 
@@ -153,17 +176,18 @@ void * thread_run(void * thread_data)
 		// handle special chars
 		char * background = strchrnul(data->buff, '&');
 		p.background = *background != '\0';
-		p.input_file = strchrnul(data->buff, '<');
-		p.output_file = strchrnul(data->buff, '>');
-
-		// find lowest position of first non argument
-		char * argumentsEnd = background < p.input_file 
-								? (background < p.output_file ? background : p.output_file)
-								: (p.input_file < p.output_file ? p.input_file : p.output_file) - 1; // newline
-
-		set_null(background);
+		p.input_file = parse_redirect(data->buff, '<', &input_start);
+		p.output_file = parse_redirect(data->buff, '>', &output_start);
+		
 		set_null(p.input_file);
 		set_null(p.output_file);
+
+		// find lowest position of first non argument
+		char * argumentsEnd = background < input_start
+								? (background < output_start ? background : output_start)
+								: (input_start < output_start ? input_start : output_start) - 1; // newline
+
+		set_null(background);
 		
 		// parse args
 		char * null_pos = data->buff;
@@ -217,19 +241,44 @@ void * thread_run(void * thread_data)
 		}
 		else if(fork_res == 0) // child
 		{
+			/* for(int i = 0; i <= p.argc; ++i) */
+			/* 	printf("argv[%d] = %s\n", i, p.argv[i]); */
+
 			if(*p.input_file != '\0')
 			{
 				i_file = open(p.input_file, O_RDONLY);
-				dup2(i_file, 0);
+
+				if(i_file < 0)
+				{
+					perror("open output");
+					exit(1);
+				}
+
+				if(dup2(i_file, 0) < 0)
+				{
+					perror("dup input");
+					exit(1);
+				}
 			}
 
 			if(*p.output_file != '\0')
 			{
-				o_file = open(p.output_file, O_WRONLY);
-				dup2(o_file, 1);
+				o_file = open(p.output_file, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+
+				if(o_file < 0)
+				{
+					perror("open input");
+					exit(1);
+				}
+
+				if(dup2(o_file, 1) < 0)
+				{
+					perror("dup output");
+					exit(1);
+				}
 			}
 
-			execvp(p.argv[0], p.argv); // return only on fail
+			execvp(p.argv[0], p.argv); // returns only on fail
 			perror("execvp");
 			
 			if(*p.input_file != '\0')
@@ -238,7 +287,7 @@ void * thread_run(void * thread_data)
 			if(*p.output_file != '\0')
 				close(o_file);
 
-			break;
+			exit(1);
 		}
 		else 
 		{
