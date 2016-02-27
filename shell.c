@@ -94,6 +94,10 @@ char * parse_redirect(char * str, char c, char ** start)
 	return symbol;
 }
 
+/**
+ * \brief Handle redirections and execute, runs as new process
+ * \param p program
+*/
 void shell_exec(program_t * p)
 {
 	int i_file, o_file;
@@ -144,6 +148,11 @@ void shell_exec(program_t * p)
 	exit(1);
 }
 
+/**
+ * \brief Prepare arguments for execution
+ * \param p program
+ * \param data thread_data
+*/
 void parse_args(program_t * p, thread_data_t * data)
 {
 	char * input_start, * output_start;
@@ -195,6 +204,20 @@ void parse_args(program_t * p, thread_data_t * data)
 	p->argv[p->argc] = NULL;
 }
 
+void buffer_signal(thread_data_t * data)
+{
+	pthread_mutex_lock(&(data->mutex));
+	pthread_cond_signal(&(data->buff_cond));
+	pthread_mutex_unlock(&(data->mutex));
+}
+
+void buffer_wait(thread_data_t * data)
+{
+	pthread_mutex_lock(&(data->mutex));
+	pthread_cond_wait(&(data->buff_cond), &(data->mutex));
+	pthread_mutex_unlock(&(data->mutex));
+}
+
 void * thread_read(void * thread_data)
 {
 	int res;
@@ -203,16 +226,9 @@ void * thread_read(void * thread_data)
 
 	while(data->run)
 	{
-		if(wait_cond)
-		{
-			pthread_mutex_lock(&(data->mutex));
-			pthread_cond_wait(&(data->buff_cond), &(data->mutex));
-			pthread_mutex_unlock(&(data->mutex));
-		}
-
 		wait_cond = true;
 
-		printf("$");
+		printf("$ ");
 		fflush(stdout);
 		memset(data->buff, 0, 513);
 
@@ -227,17 +243,19 @@ void * thread_read(void * thread_data)
 		}
 
 		if(strcmp(data->buff, "exit\n") == 0)
-			data->run = false;
-		else if(data->buff[0] == '\n')
 		{
-			wait_cond = false;
-			continue;
+			data->run = false;
+			buffer_signal(data); // let other thread run after waiting on cond
+			break;
 		}
+		else if(data->buff[0] == '\n')
+			continue;
 
+		// signal full buffer
+		buffer_signal(data);	
+		// wait until buffer is processed
+		buffer_wait(data);
 
-		pthread_mutex_lock(&(data->mutex));
-		pthread_cond_signal(&(data->buff_cond));
-		pthread_mutex_unlock(&(data->mutex));
 	}
 
 	return NULL;
@@ -259,15 +277,8 @@ void * thread_run(void * thread_data)
 		p.argv[0] = NULL;
 		p.background = 0;
 
-		// signal that buff is empty
-		pthread_mutex_lock(&(data->mutex));
-		pthread_cond_signal(&(data->buff_cond));
-		pthread_mutex_unlock(&(data->mutex));
-
 		// wait till buff is full
-		pthread_mutex_lock(&(data->mutex));
-		pthread_cond_wait(&(data->buff_cond), &(data->mutex));
-		pthread_mutex_unlock(&(data->mutex));
+		buffer_wait(data);
 
 		if(!data->run)
 			break;
@@ -278,6 +289,7 @@ void * thread_run(void * thread_data)
 		if(p.argc < 1)
 		{
 			fprintf(stderr, "Invalid input\n");
+			buffer_signal(data); // data processed
 			continue;
 		}
 		
@@ -302,6 +314,9 @@ void * thread_run(void * thread_data)
 			data->run = false;
 			break;
 		}
+
+		// signal that buff is empty
+		buffer_signal(data);
 	}
 
 	free(p.argv);
