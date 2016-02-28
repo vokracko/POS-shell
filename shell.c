@@ -342,8 +342,7 @@ int main(void)
 	pthread_mutex_init(&(thread_data.mutex), NULL);
 	pthread_cond_init(&(thread_data.buff_cond), NULL);
 
-	if(pthread_create(&(threads[0]), NULL, thread_read, (void *) &thread_data))
-		perror("pthread_create");
+	pthread_create(&(threads[0]), NULL, thread_read, (void *) &thread_data)
 	pthread_create(&(threads[1]), NULL, thread_run, (void *) &thread_data);
 
 	pthread_join(threads[0], NULL);
