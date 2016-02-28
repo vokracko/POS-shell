@@ -222,12 +222,9 @@ void * thread_read(void * thread_data)
 {
 	int res;
 	thread_data_t * data = (thread_data_t *) thread_data;
-	bool wait_cond = true;
 
 	while(data->run)
 	{
-		wait_cond = true;
-
 		printf("$ ");
 		fflush(stdout);
 		memset(data->buff, 0, 513);
@@ -336,13 +333,13 @@ int main(void)
 	sa_chld.sa_flags = 0;
 	sigemptyset(&sa_int.sa_mask);
 	sigemptyset(&sa_chld.sa_mask);
-	/* sigaction(SIGINT, &sa_int, NULL); */ //TODO odkomentovat
+	sigaction(SIGINT, &sa_int, NULL);
 	sigaction(SIGCHLD, &sa_chld, NULL);
 
 	pthread_mutex_init(&(thread_data.mutex), NULL);
 	pthread_cond_init(&(thread_data.buff_cond), NULL);
 
-	pthread_create(&(threads[0]), NULL, thread_read, (void *) &thread_data)
+	pthread_create(&(threads[0]), NULL, thread_read, (void *) &thread_data);
 	pthread_create(&(threads[1]), NULL, thread_run, (void *) &thread_data);
 
 	pthread_join(threads[0], NULL);
