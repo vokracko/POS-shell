@@ -180,7 +180,7 @@ void parse_args(program_t * p, thread_data_t * data)
 	{
 		if(p->argv_size <= p->argc + 1)
 		{
-			void * tmp = realloc(p->argv, p->argv_size * 2);
+			void * tmp = realloc(p->argv, p->argv_size * 2 * sizeof(char *));
 
 			if(tmp == NULL)
 			{
