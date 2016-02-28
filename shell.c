@@ -1,5 +1,4 @@
 #define _POSIX_SOURCE
-#define _GNU_SOURCE
 #include <stdlib.h>
 #include <sys/wait.h>
 #include <ctype.h>
@@ -32,6 +31,16 @@ typedef struct {
 
 thread_data_t thread_data;
 
+char * strchrnul_(char * str, int c)
+{
+	char * res = strchr(str, c);
+
+	if(res == NULL)
+		res = str + strlen(str);
+
+	return res;
+}
+
 void sighandler_int(int signum)
 {
 	pthread_mutex_lock(&(thread_data.process_lock));
@@ -56,7 +65,6 @@ void sighandler_chld(int signum)
 		fprintf(stderr, "[%d] stopped with signal: %d\n", pid, WSTOPSIG(return_code));
 	else
 		fprintf(stderr, "[%d] is no longer running\n", pid);
-
 }
 
 /**
@@ -81,11 +89,12 @@ char * set_null(char * str)
 */
 char * parse_redirect(char * str, char c, char ** start)
 {
-	char * symbol = *start = strchrnul(str, c);
+	char * symbol = *start = strchrnul_(str, c);
 
 	if(*symbol == '\0')
 		 return symbol;
-
+	
+	*symbol = '\0';
 	symbol++;
 
 	while(*symbol != '\0' && isspace(*symbol))
@@ -156,9 +165,10 @@ void shell_exec(program_t * p)
 void parse_args(program_t * p, thread_data_t * data)
 {
 	char * input_start, * output_start;
-	char * background = strchrnul(data->buff, '&');
+	char * background = strchrnul_(data->buff, '&');
 
 	p->background = *background != '\0';
+	*background = '\0';
 	p->input_file = parse_redirect(data->buff, '<', &input_start);
 	p->output_file = parse_redirect(data->buff, '>', &output_start);
 	
