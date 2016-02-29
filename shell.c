@@ -57,6 +57,15 @@ void sighandler_chld(int signum)
 	if(pid < 0) //alearedy handled (ie not bg procees, wait was direct)
 		return;
 
+	// bsd fix
+	pthread_mutex_lock(&(thread_data.process_lock));
+	if(thread_data.pid == pid)
+	{
+		pthread_mutex_unlock(&(thread_data.process_lock));
+		return;
+	}
+	pthread_mutex_unlock(&(thread_data.process_lock));
+
 	if(WIFEXITED(return_code))
 		fprintf(stderr, "[%d] finished with return code: %d\n", pid, WEXITSTATUS(return_code));
 	else if(WIFSIGNALED(return_code))
@@ -311,6 +320,9 @@ void * thread_run(void * thread_data)
 				data->pid = fork_res; // save current pid, CTRL+c kill
 				pthread_mutex_unlock(&(data->mutex));
 				waitpid(fork_res, NULL, 0);
+				pthread_mutex_lock(&(data->mutex));
+				data->pid = 0;
+				pthread_mutex_unlock(&(data->mutex));
 			}
 		}
 		else if(fork_res == 0) // child
