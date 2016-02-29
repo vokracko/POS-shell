@@ -5,7 +5,7 @@ BIN=shell
 ALL: $(BIN)
 
 $(BIN): shell.o
-	$(CC) $(CFLAGS) $< -o $@ -lpthread
+	$(CC) $(CFLAGS) shell.o -o $@ -lpthread
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
