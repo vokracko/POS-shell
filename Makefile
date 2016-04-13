@@ -1,11 +1,11 @@
 CC=gcc
 CFLAGS=-Wall -Wextra -pedantic -std=c99 -g3
-BIN=shell
+BIN=proj02
 
 ALL: $(BIN)
 
-$(BIN): shell.o
-	$(CC) $(CFLAGS) shell.o -o $@ -lpthread
+$(BIN): proj02.o
+	$(CC) $(CFLAGS) proj02.o -o $@ -lpthread
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
